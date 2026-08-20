@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-wallpaper",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "DeepSeek Harness Web wallpaper plugin: upload and crop a local image as the web workspace desktop background, with a dedicated Settings section.",
   "repository": {
     "type": "git",
