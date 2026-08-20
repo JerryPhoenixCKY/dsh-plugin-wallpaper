@@ -46,4 +46,5 @@ npm 页面上就会显示源码链接。
 - [x] 包名未被占用
 - [x] **2026-08-20 已发布 npm@0.1.0**（https://www.npmjs.com/package/dsh-plugin-wallpaper）
 - [x] 已从 npm registry 干净安装到全新 profile 并全链路复验
-- [ ] GitHub 仓库 + `dsh-plugin` topic（可选增强发现性，见上方方式一第 3 步或方式二）
+- [x] **2026-08-20 GitHub 仓库已建**：https://github.com/JerryPhoenixCKY/dsh-plugin-wallpaper （topics: dsh-plugin, dsh, deepseek-harness, wallpaper）
+- [x] package.json 已补 repository/homepage/author 字段，npm 0.1.1 已发布
