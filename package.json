@@ -20,7 +20,9 @@
     "lib/index.js",
     "lib/client.js",
     "cordis.patch.yml",
-    "README.zh.md"
+    "README.zh.md",
+    "CHANGELOG.md",
+    "ROADMAP.md"
   ],
   "dsh": {
     "bundle": {

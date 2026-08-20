@@ -49,18 +49,28 @@ function containRect(stageW: number, stageH: number, natW: number, natH: number)
   return { x: (stageW - w) / 2, y: (stageH - h) / 2, w, h }
 }
 
-/** Largest rect of the target aspect that fits the image. */
-function initialCrop(natW: number, natH: number, targetAspect: number): Rect {
+/**
+ * Initial crop: the largest rect of the target aspect that fits the image,
+ * then inset so the box always has room to be dragged around. A box that
+ * fills the whole image would clamp every move/resize (w === 1 leaves no
+ * slack), which made the selection feel frozen.
+ */
+function initialCrop(natW: number, natH: number, targetAspect: number, locked: boolean): Rect {
   const imgAspect = natW / natH
-  let w: number
-  let h: number
-  if (imgAspect > targetAspect) {
-    h = 1
-    w = targetAspect / imgAspect
-  } else {
-    w = 1
-    h = imgAspect / targetAspect
+  let w = 1
+  let h = 1
+  if (locked) {
+    if (imgAspect > targetAspect) {
+      h = 1
+      w = targetAspect / imgAspect
+    } else {
+      w = 1
+      h = imgAspect / targetAspect
+    }
   }
+  const INSET = 0.08
+  w = Math.max(MIN_CROP, w * (1 - 2 * INSET))
+  h = Math.max(MIN_CROP, h * (1 - 2 * INSET))
   return { x: (1 - w) / 2, y: (1 - h) / 2, w, h }
 }
 
@@ -149,7 +159,7 @@ export function CropDialog(props: CropDialogProps) {
   // Initialize the crop box once the image and the stage are known.
   useEffect(() => {
     if (nat === null || stage.w <= 0 || stage.h <= 0 || crop !== null) return
-    setCrop(lockAspect ? initialCrop(nat.w, nat.h, targetAspect) : { x: 0, y: 0, w: 1, h: 1 })
+    setCrop(initialCrop(nat.w, nat.h, targetAspect, lockAspect))
   }, [nat, stage, crop, lockAspect, targetAspect])
 
   const disp = nat === null ? null : containRect(stage.w, stage.h, nat.w, nat.h)
@@ -162,9 +172,12 @@ export function CropDialog(props: CropDialogProps) {
     const px = event.clientX - rect.left - disp.x
     const py = event.clientY - rect.top - disp.y
     const box = { x: crop.x * disp.w, y: crop.y * disp.h, w: crop.w * disp.w, h: crop.h * disp.h }
+    // Handle points are stored relative to the box's top-left corner, so
+    // offset them by the box origin before comparing with px/py (which are
+    // relative to the displayed image's top-left).
     const handle = HANDLES.find((id) => {
       const hp = handlePoint(id, box)
-      return Math.abs(px - hp.x) <= HANDLE_HIT && Math.abs(py - hp.y) <= HANDLE_HIT
+      return Math.abs(px - (box.x + hp.x)) <= HANDLE_HIT && Math.abs(py - (box.y + hp.y)) <= HANDLE_HIT
     })
     if (handle !== undefined) {
       dragRef.current = { mode: 'resize', handle, startX: event.clientX, startY: event.clientY, startCrop: { ...crop } }
@@ -172,7 +185,9 @@ export function CropDialog(props: CropDialogProps) {
       node.setPointerCapture(event.pointerId)
       return
     }
-    if (px >= box.x && px <= box.x + box.w && py >= box.y && py <= box.y + box.h) {
+    // The handles protrude half outside the box, so accept a small margin
+    // around the box bounds for the move test.
+    if (px >= box.x - HANDLE_HIT && px <= box.x + box.w + HANDLE_HIT && py >= box.y - HANDLE_HIT && py <= box.y + box.h + HANDLE_HIT) {
       dragRef.current = { mode: 'move', handle: 'se', startX: event.clientX, startY: event.clientY, startCrop: { ...crop } }
       event.preventDefault()
       node.setPointerCapture(event.pointerId)
@@ -184,7 +199,11 @@ export function CropDialog(props: CropDialogProps) {
     if (!drag || crop === null || disp === null) return
     const dx = (event.clientX - drag.startX) / Math.max(1, disp.w)
     const dy = (event.clientY - drag.startY) / Math.max(1, disp.h)
-    const next = resizeCrop(drag.startCrop, drag.mode, drag.handle, dx, dy, lockAspect ? targetAspect : null)
+    // Crop coordinates are relative to the displayed box, whose pixel aspect
+    // equals the image's — convert the workspace aspect into box-relative
+    // units so the rendered and exported crops keep the true ratio.
+    const boxAspect = targetAspect * disp.h / Math.max(1, disp.w)
+    const next = resizeCrop(drag.startCrop, drag.mode, drag.handle, dx, dy, lockAspect ? boxAspect : null)
     setCrop(next)
     event.preventDefault()
   }
@@ -234,7 +253,7 @@ export function CropDialog(props: CropDialogProps) {
             style={disp === null ? { visibility: 'hidden' } : { left: disp.x, top: disp.y, width: disp.w, height: disp.h }} />
           {crop !== null && disp !== null && (
             <div className={styles.cropBox}
-              style={{ left: crop.x * disp.w, top: crop.y * disp.h, width: crop.w * disp.w, height: crop.h * disp.h }}>
+              style={{ left: disp.x + crop.x * disp.w, top: disp.y + crop.y * disp.h, width: crop.w * disp.w, height: crop.h * disp.h }}>
               {HANDLES.map((id) => (
                 <div key={id} className={styles.cropHandle + ' ' + styles['cropHandle' + id.toUpperCase()]} />
               ))}
@@ -279,6 +298,12 @@ function handlePoint(id: Handle, box: Rect): { x: number; y: number } {
 /**
  * Apply a move or resize delta to a crop rect. Relative coordinates; the
  * aspect argument locks resizing to a w/h ratio.
+ *
+ * Resizes are anchored on the corner/edge OPPOSITE the dragged handle: the
+ * pointer tracks the moving corner (corners) or the moving edge (edges),
+ * the fixed side never moves, and the result is clamped into [0, 1] with a
+ * minimum size. Edge handles with an aspect lock resize the perpendicular
+ * dimension and derive the parallel one, centered on the opposite edge.
  */
 function resizeCrop(start: Rect, mode: 'move' | 'resize', handle: Handle, dx: number, dy: number, aspect: number | null): Rect {
   if (mode === 'move') {
@@ -295,32 +320,49 @@ function resizeCrop(start: Rect, mode: 'move' | 'resize', handle: Handle, dx: nu
   const top = handle.includes('n')
   const bottom = handle.includes('s')
 
-  if (aspect === null) {
-    let x = start.x; let y = start.y; let w = start.w; let h = start.h
-    if (left) { w = start.w - dx; x = start.x + start.w - w }
-    if (right) w = start.w + dx
-    if (top) { h = start.h - dy; y = start.y + start.h - h }
-    if (bottom) h = start.h + dy
-    w = clamp(w, MIN_CROP, 1); h = clamp(h, MIN_CROP, 1)
-    x = clamp(x, 0, 1 - w); y = clamp(y, 0, 1 - h)
-    return { x, y, w, h }
+  // Corner handles: the opposite corner stays fixed.
+  if ((left || right) && (top || bottom)) {
+    const fx = right ? start.x : start.x + start.w
+    const fy = bottom ? start.y : start.y + start.h
+    const mx = start.x + (right ? start.w : 0) + dx
+    const my = start.y + (bottom ? start.h : 0) + dy
+    let w = clamp(right ? mx - fx : fx - mx, MIN_CROP, 1)
+    let h = clamp(bottom ? my - fy : fy - my, MIN_CROP, 1)
+    if (aspect !== null) {
+      h = w / aspect
+      const hMax = top ? fy : 1 - fy
+      if (h > hMax) {
+        h = hMax
+        w = h * aspect
+      }
+      if (h < MIN_CROP) {
+        h = MIN_CROP
+        w = h * aspect
+      }
+    }
+    const x = right ? fx : fx - w
+    const y = bottom ? fy : fy - h
+    return { x: clamp(x, 0, 1 - w), y: clamp(y, 0, 1 - h), w, h }
   }
 
-  // Aspect-locked: follow the pointer on the dominant axis, then derive the
-  // other side; keep the opposite edge fixed and clamp into the image.
-  let x = start.x; let y = start.y; let w = start.w; let h = start.h
-  const horizontal = Math.abs(dx) >= Math.abs(dy)
-  if (right) w = horizontal ? start.w + dx : start.w + dy * aspect
-  else if (left) w = horizontal ? start.w - dx : start.w - dy * aspect
-  else w = start.w + (top || bottom ? dy * aspect : 0)
-  w = clamp(w, MIN_CROP, 1)
-  h = w / aspect
-  if (h > 1) { h = 1; w = h * aspect }
-  if (left) x = clamp(start.x + start.w - w, 0, 1 - w)
-  else if (right) x = clamp(start.x, 0, 1 - w)
-  else x = clamp(start.x + (start.w - w) / 2, 0, 1 - w)
-  if (top) y = clamp(start.y + start.h - h, 0, 1 - h)
-  else if (bottom) y = clamp(start.y, 0, 1 - h)
-  else y = clamp(start.y + (start.h - h) / 2, 0, 1 - h)
-  return { x, y, w, h }
+  // Edge handles.
+  if (top || bottom) {
+    const fy = bottom ? start.y : start.y + start.h
+    let h = clamp(bottom ? start.h + dy : start.h - dy, MIN_CROP, 1)
+    const cx = start.x + start.w / 2
+    let w = aspect !== null ? h * aspect : start.w
+    w = clamp(w, MIN_CROP, Math.min(2 * cx, 2 * (1 - cx), 1))
+    if (aspect !== null) h = w / aspect
+    const y = bottom ? start.y : fy - h
+    return { x: clamp(cx - w / 2, 0, 1 - w), y: clamp(y, 0, 1 - h), w, h }
+  }
+
+  const fx = right ? start.x : start.x + start.w
+  let w = clamp(right ? start.w + dx : start.w - dx, MIN_CROP, 1)
+  const cy = start.y + start.h / 2
+  let h = aspect !== null ? w / aspect : start.h
+  h = clamp(h, MIN_CROP, Math.min(2 * cy, 2 * (1 - cy), 1))
+  if (aspect !== null) w = h * aspect
+  const x = right ? start.x : fx - w
+  return { x: clamp(x, 0, 1 - w), y: clamp(cy - h / 2, 0, 1 - h), w, h }
 }

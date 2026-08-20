@@ -1,12 +1,13 @@
 /**
  * Background applier: projects the wallpaper settings onto the document.
  *
- * The theme presenter writes the --dsw-* palette tokens as plain inline
- * styles on <body>; this module injects a single <style> element whose
- * !important rules shadow those inline values while the wallpaper is on.
- * Token originals are read from the theme snapshot itself (never from
- * computed styles), so re-applying after a theme change can never fold
- * our own overrides back in.
+ * The theme presenter writes the --dsw-* palette tokens as inline styles on
+ * <body> and the base stylesheets carry both palettes; the built-in light/
+ * dark themes expose EMPTY token maps in the theme snapshot, so original
+ * token values are read from computed styles (never from the snapshot).
+ * To keep reads unpolluted, our override style is cleared for the read and
+ * rewritten afterwards — all within one synchronous task, so nothing
+ * flickers.
  */
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
@@ -48,6 +49,17 @@ export function attachBackground(ctx: ClientContext, store: WallpaperStore): () 
     return tag
   })()
 
+  /** Read the theme-owned originals; our own override is retracted first. */
+  const readOriginals = (): Record<string, string> => {
+    style.textContent = ''
+    const originals: Record<string, string> = {}
+    for (const name of PANEL_VARS) {
+      const value = getComputedStyle(document.body).getPropertyValue(name).trim()
+      if (value !== '') originals[name] = value
+    }
+    return originals
+  }
+
   const paint = () => {
     if (disposed) return
     const snapshot = store.getSnapshot()
@@ -57,17 +69,22 @@ export function attachBackground(ctx: ClientContext, store: WallpaperStore): () 
       style.textContent = ''
       return
     }
+
+    const originals = readOriginals()
     const theme = ctx.theme.getTheme()
-    const tokens = (theme.active?.tokens ?? {}) as Record<string, unknown>
     const scheme = theme.active?.colorScheme === 'dark' ? 'dark' : 'light'
     const scrim = scheme === 'dark' ? '0, 0, 0' : '255, 255, 255'
 
     const lines: string[] = ['body {']
     for (const name of PANEL_VARS) {
-      const value = tokens[name]
-      if (typeof value !== 'string') continue
-      lines.push('  ' + name + ': ' + withAlpha(value, settings.panelOpacity) + ' !important;')
+      const original = originals[name]
+      if (original === undefined) continue
+      lines.push('  ' + name + ': ' + withAlpha(original, settings.panelOpacity) + ' !important;')
     }
+
+    // Keep the letterbox areas (contain/center) in the theme base color.
+    const base = originals['--dsw-alias-bg-base']
+    if (base !== undefined) lines.push('  background-color: ' + base + ' !important;')
 
     lines.push('  background-image: linear-gradient(rgba(' + scrim + ', ' + settings.overlayOpacity + '), rgba(' + scrim + ', ' + settings.overlayOpacity + ')), url("' + imageUrl(settings.revision) + '") !important;')
     lines.push('  background-size: ' + bgSize(settings.fit) + ' !important;')

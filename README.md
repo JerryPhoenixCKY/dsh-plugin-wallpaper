@@ -85,6 +85,11 @@ The client bundle follows the web shell module protocol (`window.__ModuleLoader_
 
 After changes: `pnpm build`, then restart `dsh web`.
 
+## Changelog & Roadmap
+
+- [CHANGELOG.md](CHANGELOG.md) — release history (开发日志)
+- [ROADMAP.md](ROADMAP.md) — planned work (路线图/日程)
+
 ## License
 
 [MIT](LICENSE)

@@ -85,6 +85,11 @@ pnpm build         # esbuild → lib/index.js + lib/client.js
 
 改动后执行 `pnpm build`，重启 `dsh web` 生效。
 
+## 开发日志与路线图
+
+- [CHANGELOG.md](CHANGELOG.md) — 版本开发日志
+- [ROADMAP.md](ROADMAP.md) — 路线图 / 日程
+
 ## 许可证
 
 [MIT](LICENSE)
