@@ -1,0 +1,7 @@
+# The dsh-plugin-wallpaper bundle patch: one dual-face row.
+# The package's node half (main) provides the settings namespace, the
+# /wallpaper RPC channel, and the image GET route; its dsh.client
+# declaration adds the browser half (lib/client.js) to the web roster.
+- insert:
+    - id: wallpaper
+      name: 'dsh-plugin-wallpaper'

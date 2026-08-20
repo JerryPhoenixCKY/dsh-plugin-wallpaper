@@ -1,0 +1,229 @@
+/* Wallpaper settings section + crop dialog (compiled by the plugin build). */
+
+.section {
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  display: flex;
+}
+
+.hint {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.warning {
+  color: var(--dsw-alias-state-warn-primary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.error {
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.previewBox {
+  align-items: center;
+  justify-content: center;
+  background: var(--dsw-alias-bg-layer-1);
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 12px;
+  height: 168px;
+  overflow: hidden;
+  display: flex;
+}
+
+.previewImg {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.previewEmpty {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.actions {
+  gap: 8px;
+  display: flex;
+}
+
+.primaryBtn,
+.ghostBtn,
+.dangerBtn {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 32px;
+  padding: 0 14px;
+}
+
+.primaryBtn {
+  background: var(--dsw-alias-brand-primary);
+  color: #fff;
+}
+
+.ghostBtn {
+  background: transparent;
+  border-color: var(--dsw-alias-border-l1);
+  color: var(--dsw-alias-label-primary);
+}
+
+.dangerBtn {
+  background: transparent;
+  border-color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.primaryBtn:disabled,
+.ghostBtn:disabled,
+.dangerBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.checkRow {
+  align-items: center;
+  gap: 8px;
+  display: flex;
+  font-size: 13px;
+}
+
+.checkRow input,
+.select {
+  accent-color: var(--dsw-alias-brand-primary);
+}
+
+.row {
+  align-items: center;
+  gap: 10px;
+  display: flex;
+}
+
+.controlLabel {
+  color: var(--dsw-alias-label-primary);
+  flex: none;
+  font-size: 13px;
+  width: 108px;
+}
+
+.controlValue {
+  color: var(--dsw-alias-label-secondary);
+  flex: none;
+  font-size: 12px;
+  width: 40px;
+}
+
+.select {
+  background: var(--dsw-alias-bg-layer-1);
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 8px;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  line-height: 30px;
+  padding: 0 8px;
+}
+
+.range {
+  flex: 1;
+}
+
+/* ── crop dialog ───────────────────────────────────────────────────── */
+
+.backdrop {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  inset: 0;
+  justify-content: center;
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+}
+
+.cropDialog {
+  background: var(--dsw-alias-bg-overlay);
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 12px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+  color: var(--dsw-alias-label-primary);
+  flex-direction: column;
+  gap: 12px;
+  max-height: calc(100vh - 48px);
+  padding: 16px;
+  width: min(920px, calc(100vw - 48px));
+  display: flex;
+}
+
+.cropTitle {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.cropStageWrap {
+  background: #000;
+  border-radius: 8px;
+  height: min(56vh, 520px);
+  overflow: hidden;
+  position: relative;
+  touch-action: none;
+}
+
+.cropStageImg {
+  max-width: none;
+  pointer-events: none;
+  position: absolute;
+  user-select: none;
+}
+
+.cropBox {
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+  cursor: move;
+  position: absolute;
+}
+
+.cropHandle {
+  background: #fff;
+  border-radius: 2px;
+  height: 12px;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 12px;
+}
+
+.cropHandleNW { left: 0; top: 0; cursor: nwse-resize; }
+.cropHandleN { left: 50%; top: 0; cursor: ns-resize; }
+.cropHandleNE { left: 100%; top: 0; cursor: nesw-resize; }
+.cropHandleE { left: 100%; top: 50%; cursor: ew-resize; }
+.cropHandleSE { left: 100%; top: 100%; cursor: nwse-resize; }
+.cropHandleS { left: 50%; top: 100%; cursor: ns-resize; }
+.cropHandleSW { left: 0; top: 100%; cursor: nesw-resize; }
+.cropHandleW { left: 0; top: 50%; cursor: ew-resize; }
+
+.cropControls {
+  align-items: center;
+  gap: 10px;
+  display: flex;
+}
+
+.cropHint {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.footer {
+  gap: 8px;
+  justify-content: flex-end;
+  display: flex;
+}
