@@ -40,7 +40,10 @@ npm 页面上就会显示源码链接。
 
 ## 安全检查单
 
-- [ ] `npm publish --dry-run` 已通过（tarball 只含 lib/、cordis.patch.yml、README、LICENSE）
-- [ ] `pnpm typecheck` 通过、双产物 `node --check` 通过
-- [ ] 隔离实例端到端验证通过（RPC/路由/持久化/重启恢复）
-- [ ] 包名未被占用
+- [x] `npm publish --dry-run` 已通过（tarball 只含 lib/、cordis.patch.yml、README、LICENSE）
+- [x] `pnpm typecheck` 通过、双产物 `node --check` 通过
+- [x] 隔离实例端到端验证通过（RPC/路由/持久化/重启恢复）
+- [x] 包名未被占用
+- [x] **2026-08-20 已发布 npm@0.1.0**（https://www.npmjs.com/package/dsh-plugin-wallpaper）
+- [x] 已从 npm registry 干净安装到全新 profile 并全链路复验
+- [ ] GitHub 仓库 + `dsh-plugin` topic（可选增强发现性，见上方方式一第 3 步或方式二）
