@@ -1,87 +1,90 @@
 # dsh-plugin-wallpaper
 
-DeepSeek Harness Web 壁纸插件：在设置面板新增「背景」一栏，上传本地图片、按工作台宽高比裁切，一键设为 Web 工作台的桌面背景。
+![npm](https://img.shields.io/npm/v/dsh-plugin-wallpaper) ![license](https://img.shields.io/npm/l/dsh-plugin-wallpaper)
 
-A wallpapper plugin for the DeepSeek Harness Web surface: a dedicated
-Settings section where you upload a local image, crop it to the workspace
-aspect ratio, and apply it as the desktop background.
+Upload a local image, crop it to the workspace aspect ratio, and set it as the desktop background of the DeepSeek Harness Web surface — all from a dedicated section in Settings.
 
-## 功能 Features
+[简体中文](README.zh.md)
 
-- 设置 → 「背景」栏：预览当前背景、上传/更换、一键移除。
-- 上传后进入裁切对话框：拖拽选框移动、8 向手柄缩放；默认锁定当前窗口的宽高比，可解锁自由裁切；支持导出前模糊。
-- 即时生效：应用后无需刷新，页面刷新后自动恢复。
-- 可调参数：填充方式（cover / contain / center / stretch）、面板不透明度、遮罩不透明度。
-- 图片在浏览器端裁切并压缩为 WebP（最长边 ≤ 2560px，质量 0.85），只上传最终结果。
-- 配置持久化在标准的用户 settings 文档（`$DSH_HOME/settings.yaml` 的 `wallpaper` 段），可手工编辑。
+## Features
 
-## 安装 Install
+- A dedicated **Wallpaper** page under Settings: preview, upload, replace, and remove.
+- A crop dialog after upload: drag to move the box, eight handles to resize. The crop aspect is locked to the current workspace window by default (unlockable), with an optional export blur.
+- Applies instantly — no reload needed; restored automatically after a page refresh.
+- Tunable live settings: fit mode (cover / contain / center / stretch), panel opacity (how much the wallpaper shows through the app panels), and overlay dimming.
+- Cropped and compressed in the browser (WebP, longest edge ≤ 2560 px, quality 0.85); only the final result is uploaded.
+- Settings persist in the standard user settings document (`$DSH_HOME/settings.yaml`, `wallpaper` section) and can be hand-edited.
 
-已发布时（npm）：
+## Install
+
+From npm:
 
 ```sh
 dsh plugin --profile web add dsh-plugin-wallpaper
 ```
 
-本地开发（link 方式，本仓库）：
+From GitHub (the `prepare` script builds the bundles on install):
 
 ```sh
-dsh plugin --profile web add link:<插件目录绝对路径>
+dsh plugin --profile web add github:JerryPhoenixCKY/dsh-plugin-wallpaper
 ```
 
-然后重启 `dsh web`（插件在启动时装载）：
+Local development:
 
 ```sh
-dsh web   # 或 dsh --profile web
+dsh plugin --profile web add link:<absolute path to this repo>
 ```
 
-移除：`dsh plugin --profile web remove dsh-plugin-wallpaper` 并重启。
+Then restart `dsh web` (plugins load at startup):
 
-## 使用 Usage
+```sh
+dsh web   # or: dsh --profile web
+```
 
-1. 打开设置（侧边栏齿轮）→ 「背景」。
-2. 点击「上传图片」选择本地图片（≤ 20 MB）。
-3. 在裁切对话框中调整选框与模糊，「应用为背景」。
-4. 用「面板不透明度 / 遮罩不透明度」调出合适的观感；「移除背景」恢复默认。
+Remove: `dsh plugin --profile web remove dsh-plugin-wallpaper`, then restart.
 
-注意：只有本机（localhost/127.0.0.1）打开页面才能上传或修改；
-局域网内其他机器可以查看背景，但写入被拒（写入通道仅信任 loopback）。
+## Usage
 
-## 存储 Storage
+1. Open Settings (the gear in the sidebar) → **Wallpaper**.
+2. Click **Upload image** and pick a local image (≤ 20 MB).
+3. Frame the region in the crop dialog, optionally blur it, then **Apply as background**.
+4. Tune **Panel opacity** and **Overlay dimming** to taste; **Remove wallpaper** restores the default look.
+
+Note: uploading and editing require opening the page from this machine (localhost). Other machines on the LAN can see the background but writes are refused — the write channel only trusts loopback.
+
+## Storage
 
 `$DSH_HOME/storages/wallpaper/`
 
-- `wallpaper.webp` — 最近一次上传的裁切结果。
-- `wallpaper.json` — `{ revision, width, height, updatedAt }`，revision 由服务端单调递增。
-- 配置（enabled/fit/遮罩/面板不透明度/revision）保存在 `$DSH_HOME/settings.yaml` 的 `wallpaper` 段。
+- `wallpaper.webp` — the latest uploaded crop result.
+- `wallpaper.json` — `{ revision, width, height, updatedAt }`; the revision is server-authoritative and monotonic.
+- Display settings (enabled / fit / overlay opacity / panel opacity / revision) live in the `wallpaper` section of `$DSH_HOME/settings.yaml`.
 
-## 架构 Architecture
+## Architecture
 
-一个双面包（host + browser）：
+One dual-face bundle (host + browser):
 
-- 宿主半身（`src/index.ts` → `lib/index.js`）：
-  - `ctx.settings.register("wallpaper", schema)` — schema 校验 + 默认值 + 持久化（rc.6 的 settings 线上白名单不覆盖第三方命名空间，因此浏览器侧不走 settings 线 API）；
-  - `/wallpaper` 通用 RPC 通道（仅 loopback）：`config/get`、`config/set`、`put`、`remove`、`info`；
-  - `GET /plugins/wallpaper/image?v=<revision>` — 按 revision 提供图片（不可变缓存 + 防陈旧 URL）。
-- 浏览器半身（`src/client/**` → `lib/client.js`）：
-  - 向 `settings.section` 槽位注册「背景」设置页（上传/裁切/预览/参数）；
-  - 通过 `ctx.get("connection")` 取 wire 句柄，用 `WallpaperStore`（合并写入器）读写配置；
-  - `attachBackground` 把配置投影为文档样式：`body` 背景图 + 主题 token（`--dsw-alias-bg-*`）半透明化 + 遮罩渐变，订阅 `theme/change` 保持主题联动。
+- **Host half** (`src/index.ts` → `lib/index.js`):
+  - `ctx.settings.register("wallpaper", schema)` — validation, defaults, and persistence. (The rc.6 settings *wire* allowlist does not cover third-party namespaces, so the browser side never rides the settings API.)
+  - The `/wallpaper` generic-RPC channel (loopback-only): `config/get`, `config/set`, `put`, `remove`, `info`.
+  - `GET /plugins/wallpaper/image?v=<revision>` — serves the image keyed by revision (immutable caching; stale revisions 404).
+- **Browser half** (`src/client/**` → `lib/client.js`):
+  - Registers the Wallpaper page into the `settings.section` slot (upload / crop / preview / controls).
+  - Reads the wire handle via `ctx.get("connection")` (the official client-plugin pattern) and reads/writes config through `WallpaperStore`, a coalescing writer over the RPC channel.
+  - `attachBackground` projects the config onto the document: the `body` background image, the theme tokens (`--dsw-alias-bg-*`) made translucent, and the dimming gradient — kept in sync with `theme/change`.
 
-## 开发 Develop
+## Development
 
 ```sh
 pnpm install
 pnpm typecheck     # tsc --noEmit
-pnpm build         # esbuild 产出 lib/index.js 与 lib/client.js
+pnpm build         # esbuild → lib/index.js + lib/client.js
 ```
 
-客户端产物遵循 Web 外壳的模块协议（`window.__ModuleLoader__.load({ id, factory })`），
-external 与 `@deepseek-ai/dsh-client-web` 的 `PLATFORM_MODULES` 种子表及 `dsh.client.inject` 保持一致；
-CSS Modules 由 `scripts/build.mjs` 内联编译并按官方约定注入（`<style data-plugin-css>`）。
+The client bundle follows the web shell module protocol (`window.__ModuleLoader__.load({ id, factory })`); its externals match the `PLATFORM_MODULES` seed table of `@deepseek-ai/dsh-client-web` plus the packages declared in `dsh.client.inject`. CSS Modules are compiled inline by `scripts/build.mjs` and injected with the official `<style data-plugin-css>` convention.
 
-修改后重跑 `pnpm build`，然后重启 `dsh web` 生效。
+After changes: `pnpm build`, then restart `dsh web`.
 
 ## License
 
-MIT
+[MIT](LICENSE)
