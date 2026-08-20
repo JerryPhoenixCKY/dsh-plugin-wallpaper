@@ -15,6 +15,20 @@ Upload a local image, crop it to the workspace aspect ratio, and set it as the d
 - Cropped and compressed in the browser (WebP, longest edge ≤ 2560 px, quality 0.85); only the final result is uploaded.
 - Settings persist in the standard user settings document (`$DSH_HOME/settings.yaml`, `wallpaper` section) and can be hand-edited.
 
+## Screenshots
+
+The Wallpaper section in Settings:
+
+<img src="demo/3.png" alt="Wallpaper section in Settings" width="680">
+
+Cropping after upload (aspect locked to the workspace, eight resize handles):
+
+<img src="demo/2.png" alt="Crop dialog" width="680">
+
+The workspace with the wallpaper applied:
+
+<img src="demo/1.png" alt="Workspace with the wallpaper applied" width="680">
+
 ## Install
 
 From npm:

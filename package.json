@@ -22,7 +22,8 @@
     "cordis.patch.yml",
     "README.zh.md",
     "CHANGELOG.md",
-    "ROADMAP.md"
+    "ROADMAP.md",
+    "demo"
   ],
   "dsh": {
     "bundle": {

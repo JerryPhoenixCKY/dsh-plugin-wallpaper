@@ -15,6 +15,20 @@
 - 图片在浏览器端裁切并压缩（WebP，最长边 ≤ 2560 px，质量 0.85），只上传最终结果。
 - 配置持久化在标准用户 settings 文档（`$DSH_HOME/settings.yaml` 的 `wallpaper` 段），支持手工编辑。
 
+## 截图
+
+设置页里的「背景」栏：
+
+<img src="demo/3.png" alt="设置页背景栏" width="680">
+
+上传后的裁切对话框（比例锁定为工作台宽高比，八向手柄缩放）：
+
+<img src="demo/2.png" alt="裁切对话框" width="680">
+
+应用壁纸后的工作台：
+
+<img src="demo/1.png" alt="应用壁纸后的工作台" width="680">
+
 ## 安装
 
 从 npm：
