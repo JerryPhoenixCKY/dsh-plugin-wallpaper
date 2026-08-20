@@ -44,7 +44,7 @@ npm 页面上就会显示源码链接。
 - [x] `pnpm typecheck` 通过、双产物 `node --check` 通过
 - [x] 隔离实例端到端验证通过（RPC/路由/持久化/重启恢复）
 - [x] 包名未被占用
-- [x] **2026-08-20 已发布 npm@0.1.0**（https://www.npmjs.com/package/dsh-plugin-wallpaper）
+- [x] **2026-08-20 已发布 npm**（https://www.npmjs.com/package/dsh-plugin-wallpaper）：最新 **0.1.3**（裁切与壁纸显示修复）
 - [x] 已从 npm registry 干净安装到全新 profile 并全链路复验
 - [x] **2026-08-20 GitHub 仓库已建**：https://github.com/JerryPhoenixCKY/dsh-plugin-wallpaper （topics: dsh-plugin, dsh, deepseek-harness, wallpaper）
 - [x] package.json 已补 repository/homepage/author 字段，npm 0.1.1 已发布
