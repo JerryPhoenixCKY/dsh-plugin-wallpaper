@@ -49,6 +49,11 @@ npm 页面上就会显示源码链接。
 - [x] **2026-08-20 GitHub 仓库已建**：https://github.com/JerryPhoenixCKY/dsh-plugin-wallpaper （topics: dsh-plugin, dsh, deepseek-harness, wallpaper）
 - [x] package.json 已补 repository/homepage/author 字段，npm 0.1.1 已发布
 - [x] **2026-09-14 已发布 npm 0.1.5**：修复 `lib/index.js` 中重复的 `inject` 声明导致插件无法加载。已 `git push` 至 GitHub（`main` = `bedbbf6`）并 `npm publish`；发布产物已从 registry 重新下载、干净安装并加载复验通过（`inject` 声明恰好一处）。
+- [x] **2026-09-14 已发布 npm 0.1.6**（当前 latest）：修掉 0.1.5 修完语法后暴露的真正运行时故障——`ctx.connection.rpc.handle()` 在 dsh 0.1.5 上抛 `cannot get property "webServer" without inject`，导致整棵插件树加载失败。改为把 `/wallpaper` 直接挂在 Host webserver 上并自实现 RPC 信封。GitHub `main` = `aaeb572`。
+- [x] **0.1.5 已在 npm 上标记 deprecated**（它会让 DSH 无法启动），指向 0.1.6。
+- [x] 0.1.6 复验方式升级：隔离 `DSH_HOME` + 独立端口起真实实例，从 npm 干净安装后加载插件树并跑完 18 项频道协议检查 + 上传/落盘/按 revision 提供/过期拒绝/删除 全往返。
+
+> **调试用隔离环境**（本次引入，复发时可直接复用）：把 `DSH_HOME` 指向工作区内的目录、用 `dsh --profile <名字> --port <另一个端口>` 起实例，就能在不碰线上 profile、不影响正在运行的 GUI 的前提下复现和验证。`dsh-plugin-wallpaper` 用 `link:` 装进该 profile 即可对着本地源码迭代。
 
 ## 本机发布环境注意事项（2026-09-14 实测）
 
