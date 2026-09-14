@@ -2,6 +2,15 @@
 
 本项目的所有值得注意的变更都记录在此文件。
 
+## [0.1.5] — 2026-09-14
+
+### 修复 Fixed
+
+- **插件完全无法加载：`SyntaxError: Identifier 'inject' has already been declared`**。上一提交（`93579e3`）向**构建产物** `lib/index.js` 末尾手工追加了 3 行——`const inject = ["webServer"]` 与重复的 `export { apply, inject }`。而该文件上方由 esbuild 生成的 `var inject = ["settings", "connection", "webServer"]` 已经声明过 `inject`，同一模块作用域内重复声明，导致模块解析失败、插件整体加载不了。
+  该追加既**冗余**（`src/index.ts` 早已在 inject 列表中声明 `webServer`，生成产物同样包含）又**致命**。现已删除，`lib/index.js` 恢复为与 `src/` 逐字节一致的构建产物（重新构建 `git diff` 为零）。
+- 教训：`lib/` 是 `scripts/build.mjs` 的生成目录，**禁止手工编辑**；一切修改都在 `src/` 中进行后重新构建。
+- 影响范围说明：**0.1.4 发布版本不受影响**——发布提交 `168ab70` 的 `lib/index.js` 是正确的，坏的改动从未随任何版本发布出去。
+
 ## [0.1.4] — 2026-08-20
 
 - README 新增「截图」章节（中英双语）：设置页「背景」栏、裁切对话框、应用壁纸后的工作台三张截图（`demo/` 目录）。

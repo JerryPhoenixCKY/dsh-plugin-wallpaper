@@ -44,7 +44,10 @@ npm 页面上就会显示源码链接。
 - [x] `pnpm typecheck` 通过、双产物 `node --check` 通过
 - [x] 隔离实例端到端验证通过（RPC/路由/持久化/重启恢复）
 - [x] 包名未被占用
-- [x] **2026-08-20 已发布 npm**（https://www.npmjs.com/package/dsh-plugin-wallpaper）：最新 **0.1.3**（裁切与壁纸显示修复）
+- [x] **2026-08-20 已发布 npm**（https://www.npmjs.com/package/dsh-plugin-wallpaper）：最新 **0.1.4**（README 截图章节）
 - [x] 已从 npm registry 干净安装到全新 profile 并全链路复验
 - [x] **2026-08-20 GitHub 仓库已建**：https://github.com/JerryPhoenixCKY/dsh-plugin-wallpaper （topics: dsh-plugin, dsh, deepseek-harness, wallpaper）
 - [x] package.json 已补 repository/homepage/author 字段，npm 0.1.1 已发布
+- [ ] **0.1.5 待上传**（2026-09-14 本地已就绪）：修复 `lib/index.js` 里重复的 `inject` 声明导致插件无法加载。版本号、CHANGELOG 已更新并提交，`npm pack --dry-run` 已复验；仅差 `git push` 与 `npm publish`，两者都因本机凭据缺失未执行（npm token 401、git 无 GitHub 凭据、gh 未安装）。
+
+> 注意：本机 `npm publish` 会触发 `prepare` → `scripts/build.mjs`，而 esbuild 的服务进程走命名管道，在 DSH 沙箱受限模式下会 `spawn EPERM`。由于 `lib/` 已构建且与 `src/` 逐字节一致，发布时可用 `npm publish --ignore-scripts` 跳过构建；或在未受限的普通终端里直接 `npm publish`。
