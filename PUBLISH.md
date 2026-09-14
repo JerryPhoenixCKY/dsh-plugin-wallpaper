@@ -48,6 +48,21 @@ npm 页面上就会显示源码链接。
 - [x] 已从 npm registry 干净安装到全新 profile 并全链路复验
 - [x] **2026-08-20 GitHub 仓库已建**：https://github.com/JerryPhoenixCKY/dsh-plugin-wallpaper （topics: dsh-plugin, dsh, deepseek-harness, wallpaper）
 - [x] package.json 已补 repository/homepage/author 字段，npm 0.1.1 已发布
-- [ ] **0.1.5 待上传**（2026-09-14 本地已就绪）：修复 `lib/index.js` 里重复的 `inject` 声明导致插件无法加载。版本号、CHANGELOG 已更新并提交，`npm pack --dry-run` 已复验；仅差 `git push` 与 `npm publish`，两者都因本机凭据缺失未执行（npm token 401、git 无 GitHub 凭据、gh 未安装）。
+- [x] **2026-09-14 已发布 npm 0.1.5**：修复 `lib/index.js` 中重复的 `inject` 声明导致插件无法加载。已 `git push` 至 GitHub（`main` = `bedbbf6`）并 `npm publish`；发布产物已从 registry 重新下载、干净安装并加载复验通过（`inject` 声明恰好一处）。
 
-> 注意：本机 `npm publish` 会触发 `prepare` → `scripts/build.mjs`，而 esbuild 的服务进程走命名管道，在 DSH 沙箱受限模式下会 `spawn EPERM`。由于 `lib/` 已构建且与 `src/` 逐字节一致，发布时可用 `npm publish --ignore-scripts` 跳过构建；或在未受限的普通终端里直接 `npm publish`。
+## 本机发布环境注意事项（2026-09-14 实测）
+
+本次发布踩到的三个坑，下次发版可直接照做：
+
+1. **`git push` 报 `schannel: AcquireCredentialsHandle failed: SEC_E_NO_CREDENTIALS`**
+   这不是缺凭据——连匿名 `git ls-remote` 都同样失败，是 git 的 schannel TLS 后端取不到系统加密凭据。改用 Git 自带的 OpenSSL 后端即可：
+   ```powershell
+   git -c http.sslBackend=openssl push origin main
+   # 或一劳永逸：git config --global http.sslBackend openssl
+   ```
+
+2. **`npm publish` 报 `403 ... granular access token with bypass 2fa enabled is required`**
+   账号开了 2FA 时，**Classic token 无法发布**。必须新建 **Granular Access Token**，权限 `Read and write`，并打开 **Bypass 2FA**。
+
+3. **`npm publish` 触发 `prepare` → `scripts/build.mjs` 时 `spawn EPERM`**
+   esbuild 的服务进程走命名管道，在 DSH 沙箱受限模式下必然失败。若 `lib/` 已构建且与 `src/` 一致，可用 `npm publish --ignore-scripts` 跳过；否则在未受限的普通终端里发布。
