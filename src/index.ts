@@ -7,8 +7,9 @@
  *    rc.6 allowlist covers only built-in namespaces — so the browser
  *    reads and writes it through this channel's config/get and
  *    config/set endpoints),
- *  - the /wallpaper generic-RPC channel (loopback-only):
- *    config/get, config/set, put, remove, info,
+ *  - the /wallpaper channel (config/get, config/set, put, remove, info),
+ *    mounted as a Host-webserver prefix route that speaks the generic
+ *    Connection RPC envelope itself (see serveRpc for why),
  *  - the GET /plugins/wallpaper/image route serving the stored WebP with
  *    revision-based cache busting (?v=<revision>).
  *
@@ -24,17 +25,19 @@
 import { createReadStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 
 // Type-only imports keep the Context service augmentations active:
 //   ctx.settings  (@deepseek-ai/dsh-settings)
 //   ctx.webServer (@deepseek-ai/dsh-host-webserver)
-//   ctx.connection (@deepseek-ai/dsh-client-connection, host half)
+// `dsh-client-connection` is imported for the RPC envelope type only: the
+// channel itself is a plain webServer route (see serveRpc), so the plugin
+// deliberately does NOT depend on the connection service at runtime.
 import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-host-webserver'
-import type {} from '@deepseek-ai/dsh-client-connection'
 
 export const name = 'wallpaper'
 
@@ -68,6 +71,111 @@ interface WallpaperMeta {
 
 const MAX_PAYLOAD_CHARS = 10_000_000 // ~7.5 MB of binary as base64
 const MAX_IMAGE_BYTES = 8_000_000
+
+/** Channel path; the browser half calls `connection.rpc.call(CHANNEL, …)`. */
+const CHANNEL = '/wallpaper'
+
+/** Endpoint segment rule, copied from dsh-client-connection's wire contract. */
+const ENDPOINT_SEGMENT_PATTERN = /^[A-Za-z0-9_$.-]+$/
+
+/** Cap on one RPC request body; an upload is base64, so ~4/3 of the image. */
+const MAX_RPC_BODY_BYTES = 14_000_000
+
+/** `POST ${CHANNEL}/${endpoint}` → endpoint, or undefined when the path is not ours. */
+function endpointOf(pathname: string): string | undefined {
+  if (!pathname.startsWith(`${CHANNEL}/`)) return undefined
+  const endpoint = pathname.slice(CHANNEL.length + 1)
+  if (endpoint.split('/').some((segment) => segment === '' || segment === '.' || segment === '..' || !ENDPOINT_SEGMENT_PATTERN.test(segment))) return undefined
+  return endpoint
+}
+
+/** Collect a node request body as UTF-8 text, refusing oversized payloads. */
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolveBody, rejectBody) => {
+    const chunks: Buffer[] = []
+    let size = 0
+    req.on('data', (chunk: Buffer) => {
+      size += chunk.length
+      if (size > MAX_RPC_BODY_BYTES) {
+        rejectBody(new Error('request body is too large'))
+        req.destroy()
+        return
+      }
+      chunks.push(chunk)
+    })
+    req.on('end', () => resolveBody(Buffer.concat(chunks).toString('utf8')))
+    req.on('error', rejectBody)
+  })
+}
+
+/** Write a server-response envelope; rpcId must echo the caller's id. */
+function respond(res: ServerResponse, rpcId: string, result: HandlerResult): void {
+  const text = JSON.stringify({ type: 'server-response', rpcId, result })
+  res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Length': String(Buffer.byteLength(text)) })
+  res.end(text)
+}
+
+/**
+ * Serve one generic Connection RPC exchange over the node req/res pair the
+ * Host webserver hands to a prefix route.
+ *
+ * This mirrors dsh-client-connection's own `rpcFetchHandler`, so the browser
+ * half's `connection.rpc.call(CHANNEL, endpoint, payload)` keeps working
+ * unchanged: POST + application/json in, `{type:'server-response', rpcId,
+ * result}` out, with rpcId echoed verbatim.
+ */
+async function serveRpc(req: IncomingMessage, res: ServerResponse, dispatch: ConnectionRpcHandler): Promise<void> {
+  let pathname: string
+  try {
+    pathname = new URL(req.url ?? '/', 'http://wallpaper.local').pathname
+  } catch {
+    pathname = ''
+  }
+  const endpoint = endpointOf(pathname)
+  if (req.method !== 'POST' || endpoint === undefined) {
+    res.writeHead(404, { 'Content-Type': 'text/plain' })
+    res.end('not found')
+    return
+  }
+  const contentType = String(req.headers['content-type'] ?? '').split(';', 1)[0]?.trim().toLowerCase()
+  if (contentType !== 'application/json') {
+    res.writeHead(415, { 'Content-Type': 'text/plain' })
+    res.end('content type must be application/json')
+    return
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(await readBody(req))
+  } catch {
+    res.writeHead(400, { 'Content-Type': 'text/plain' })
+    res.end('body is not JSON')
+    return
+  }
+
+  const message = (typeof parsed === 'object' && parsed !== null ? parsed : {}) as Record<string, unknown>
+  const rpcId = typeof message.rpcId === 'string' ? message.rpcId : 'invalid-request'
+  if (message.type !== 'client-request' || typeof message.rpcId !== 'string' || typeof message.method !== 'string') {
+    respond(res, rpcId, failBadRequest('invalid client-request message'))
+    return
+  }
+  if (message.method !== endpoint) {
+    respond(res, rpcId, failBadRequest(`method ${JSON.stringify(message.method)} does not match endpoint ${JSON.stringify(endpoint)}`))
+    return
+  }
+
+  const controller = new AbortController()
+  const onAborted = () => controller.abort()
+  req.on('aborted', onAborted)
+  try {
+    respond(res, rpcId, await dispatch(endpoint, message.payload, controller.signal))
+  } catch (error) {
+    res.writeHead(500, { 'Content-Type': 'text/plain' })
+    res.end(`handler failure: ${String(error)}`)
+  } finally {
+    req.off('aborted', onAborted)
+  }
+}
 
 /** Result shape the connection RPC transport expects (its own RpcResult copy). */
 type HandlerResult = Awaited<ReturnType<ConnectionRpcHandler>>
@@ -124,8 +232,17 @@ export function apply(ctx: Context) {
   /** Fields the browser may change through config/set. */
   const CONFIG_FIELDS = ['enabled', 'fit', 'overlayOpacity', 'panelOpacity']
 
-  // ── /wallpaper RPC channel (loopback only) ─────────────────────────
-  ctx.effect(() => ctx.connection.rpc.handle('/wallpaper', async (endpoint, payload, signal) => {
+  // ── /wallpaper channel ─────────────────────────────────────────────
+  // Served as a plain Host-webserver prefix route instead of through
+  // `ctx.connection.rpc.handle()`. That registry resolves `webServer`
+  // through the *provider's* own context — dsh-client-connection's
+  // `register()` runs `owner.webServer.register(...)` where `owner` is the
+  // service's shadowed ctx — which throws `cannot get property "webServer"
+  // without inject` under dsh 0.1.5. There it is fatal (it aborts the whole
+  // plugin tree) and dsh-context, the only other caller, silently disables
+  // its channel around the same call. The wire contract the browser half
+  // consumes is unchanged; serveRpc implements it.
+  const dispatch: ConnectionRpcHandler = async (endpoint, payload, signal) => {
     if (signal?.aborted) return failInternal('aborted')
 
     switch (endpoint) {
@@ -200,7 +317,13 @@ export function apply(ctx: Context) {
       default:
         return failBadRequest('unknown wallpaper endpoint "' + endpoint + '"')
     }
-  }, { authority: 'loopback' }), 'wallpaper: rpc channel')
+  }
+
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'prefix',
+    path: CHANNEL,
+    handler: (req, res) => { void serveRpc(req, res, dispatch) }
+  }), 'wallpaper: rpc channel')
 
   // ── GET /plugins/wallpaper/image?v=<revision> ──────────────────────
   ctx.effect(() => ctx.webServer.register({
@@ -242,4 +365,4 @@ export function apply(ctx: Context) {
   }), 'wallpaper: image route')
 }
 
-export const inject = ['settings', 'connection', 'webServer']
+export const inject = ['settings', 'webServer']

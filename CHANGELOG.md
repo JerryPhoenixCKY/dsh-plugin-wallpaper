@@ -2,6 +2,21 @@
 
 本项目的所有值得注意的变更都记录在此文件。
 
+## [0.1.6] — 2026-09-14
+
+### 修复 Fixed
+
+- **插件导致 DSH 整个启动失败：`cannot get property "webServer" without inject`**。0.1.5 修掉语法错误后，暴露出真正的运行时故障：`ctx.connection.rpc.handle()` 在 dsh 0.1.5 上不可用。
+
+  根因在 `dsh-client-connection` 的 `register()`：它用 `owner.webServer.register(route)` 注册频道，而 `owner` 取的是该服务**自身**的 shadowed context（`get rpc()` 里的 `this.ctx`），不是调用方的 context。于是 `webServer` 的解析从服务自己的 fiber 出发，而该插件的 `inject` 只有 `["credentials"]`，解析不到 `webServer` 便抛错。这个异常对调用方是致命的——整棵插件树加载失败；dsh-context 是目前唯一另一个调用方，它用一层空的 `try { } catch { return }` 把同一个异常吞掉并静默停用自己的频道。DSH 自带插件里没有任何一个使用 `connection.rpc.handle`。
+
+  **改法**：不再依赖该注册表。`/wallpaper` 频道改为直接挂在 Host webserver 上的 prefix 路由，由新增的 `serveRpc()` 自行实现 Connection RPC 信封协议（`POST` + `application/json` 进，`{type:'server-response', rpcId, result}` 出，`rpcId` 原样回显），与 `dsh-client-connection` 自身的 `rpcFetchHandler` 逐条对齐。**浏览器侧零改动**：客户端照旧调用 `connection.rpc.call('/wallpaper', …)`。
+- node 半边的 `inject` 由 `['settings', 'connection', 'webServer']` 收窄为 `['settings', 'webServer']`：频道不再经过 connection 服务，运行时不再依赖它。
+
+### 测试 Tested
+
+- 新增隔离验证环境（独立 `DSH_HOME` + 独立端口），先精确复现原故障，再验证修复：插件树正常加载；18 项频道协议检查全部通过（信封、`rpcId` 回显、错误码、400/415/404 边界）；并完成完整的上传 → 落盘 → 按 revision 提供 → 过期 revision 拒绝 → 删除 往返。
+
 ## [0.1.5] — 2026-09-14
 
 ### 修复 Fixed
